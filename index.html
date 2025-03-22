@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NewsBridge - Professional News Digest</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <h1>NewsBridge</h1>
+                <p>Global News Network</p>
+            </div>
+            <nav class="filter-bar">
+                <button class="filter-btn active" data-filter="all">
+                    <i class="fas fa-globe"></i> All
+                </button>
+                <button class="filter-btn" data-filter="india">
+                    <i class="fas fa-peace"></i> India
+                </button>
+                <button class="filter-btn" data-filter="world">
+                    <i class="fas fa-flag"></i> World
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="news-container" id="newsContainer"></main>
+
+    <footer class="footer">
+        <p>Crafted with precision by <strong>Samant Kumar</strong></p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
