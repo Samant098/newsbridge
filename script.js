@@ -4,6 +4,10 @@ const feeds = {
     world: 'http://feeds.bbci.co.uk/news/world/rss.xml'
 };
 
+let currentPage = 1;
+const itemsPerPage = 10;
+let allArticles = [];
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadNews();
@@ -14,38 +18,38 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadNews() {
     try {
         const [indiaRes, worldRes] = await Promise.all([
-            fetchNews(feeds.india, 'india'),
-            fetchNews(feeds.world, 'world')
+            fetchNews(feeds.india, 'The Hindu'),
+            fetchNews(feeds.world, 'BBC News')
         ]);
         
-        showNews([...indiaRes, ...worldRes]);
+        allArticles = [...indiaRes, ...worldRes];
+        showNews(currentPage);
+        createPagination(allArticles.length);
     } catch (error) {
         console.error('News loading failed:', error);
     }
 }
 
-async function fetchNews(url, type) {
+async function fetchNews(url, source) {
     try {
         const response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${url}&api_key=${API_KEY}`);
         const data = await response.json();
         return (data.items || []).map(item => ({
             ...item,
-            type,
-            image: getImageUrl(item),
-            source: item.author || item.feed
+            source,
+            type: url.includes('india') ? 'india' : 'world',
+            image: item.enclosure?.link || item.media?.content?.url
         }));
     } catch (error) {
-        console.error('Feed error:', url, error);
+        console.error('Feed error:', error);
         return [];
     }
 }
 
-// In script.js - Modify the getImageUrl and getFallbackImage functions
-
-// Replace existing image handling functions with this:
+// Image Handling with Getty Fix
 function getImageUrl(article) {
-    // Detect Getty Images URLs
-    if (article.image && article.image.includes('gettyimages')) {
+    // Block Getty Images and invalid URLs
+    if (article.image && (article.image.includes('gettyimages') || !isValidImageUrl(article.image))) {
         return getFallbackImage(article);
     }
     return article.image ? 
@@ -53,60 +57,83 @@ function getImageUrl(article) {
         getFallbackImage(article);
 }
 
-function getFallbackImage(article) {
-    // Use Google Custom Search API for relevant images (free tier available)
-    const keywords = encodeURIComponent(`${article.title} ${article.type} news`);
-    return `https://source.unsplash.com/600x400/?${keywords}`;
-    
-    // Alternative: Use Wikimedia Commons
-    // return `https://commons.wikimedia.org/w/api.php?action=query&titles=${keywords}&prop=imageinfo&iiprop=url&format=json`;
+function isValidImageUrl(url) {
+    try {
+        new URL(url);
+        return url.match(/\.(jpeg|jpg|gif|png|webp)$/i);
+    } catch {
+        return false;
+    }
 }
 
-// In the showNews function's image HTML - Add error handling:
-<img class="news-image" 
-     src="${getImageUrl(article)}" 
-     alt="${article.title}"
-     loading="lazy"
-     onerror="this.onerror=null;this.src='${getFallbackImage(article)}'">
+function getFallbackImage(article) {
+    const keywords = encodeURIComponent(`${article.title} ${article.type} news`.substring(0, 50));
+    return `https://source.unsplash.com/600x400/?${keywords}`;
 }
 
 // Display News
-function showNews(articles) {
+function showNews(page) {
+    currentPage = page;
+    const start = (page - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const articlesToShow = allArticles.slice(start, end);
+    
     const container = document.getElementById('newsContainer');
-    container.innerHTML = articles.map(article => `
+    container.innerHTML = articlesToShow.map((article, index) => `
         <article class="news-article" data-type="${article.type}">
-            <div class="article-image">
-                <img class="news-image" 
-                     src="${getProxiedImage(article.image, article.type)}" 
-                     alt="${article.title}"
-                     loading="lazy"
-                     onerror="this.src='${getFallbackImage(article.type)}'">
+            <div class="article-header">
+                <span class="article-number">${start + index + 1}</span>
+                <div class="article-source">${article.source}</div>
             </div>
             <div class="article-content">
-                <div class="article-source">${article.source}</div>
-                <h2 class="article-title">${article.title}</h2>
-                <p class="article-excerpt">${cleanText(article.description)}</p>
-                <a href="${article.link}" class="read-more" target="_blank">
-                    Full Story <i class="fas fa-external-link-alt"></i>
-                </a>
+                <div class="article-image">
+                    <img class="news-image" 
+                         src="${getImageUrl(article)}" 
+                         alt="${article.title}"
+                         loading="lazy"
+                         onerror="this.onerror=null;this.src='${getFallbackImage(article)}'">
+                </div>
+                <div class="article-details">
+                    <h2>${article.title}</h2>
+                    <p class="article-excerpt">${generateSummary(article.description)}</p>
+                    <a href="${article.link}" class="read-more" target="_blank">
+                        Full Article <i class="fas fa-external-link-alt"></i>
+                    </a>
+                </div>
             </div>
         </article>
     `).join('');
+    
+    updatePagination();
 }
 
-function getProxiedImage(url, type) {
-    return url ? `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=800&h=600&fit=cover` 
-              : getFallbackImage(type);
+function generateSummary(text) {
+    return text.replace(/<[^>]+>/g, '')
+              .split(/\s+/)
+              .slice(0, 90)
+              .join(' ') + '...';
 }
 
-function getFallbackImage(type) {
-    return type === 'india' 
-        ? 'https://source.unsplash.com/800x600/?india' 
-        : 'https://source.unsplash.com/800x600/?world';
+// Pagination
+function createPagination(totalItems) {
+    const pageCount = Math.ceil(totalItems / itemsPerPage);
+    const pagination = document.getElementById('pagination');
+    pagination.innerHTML = Array.from({length: pageCount}, (_, i) => 
+        `<button class="page-btn" data-page="${i + 1}">${i + 1}</button>`
+    ).join('');
+    
+    pagination.querySelectorAll('.page-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentPage = parseInt(btn.dataset.page);
+            showNews(currentPage);
+        });
+    });
 }
 
-function cleanText(text) {
-    return text.replace(/<[^>]+>/g, '').substring(0, 200).trim() + '...';
+function updatePagination() {
+    document.querySelectorAll('.page-btn').forEach(btn => {
+        btn.classList.toggle('active', parseInt(btn.dataset.page) === currentPage);
+    });
 }
 
 // Filter System
@@ -123,8 +150,11 @@ function setupFilters() {
 }
 
 function filterNews(type) {
-    document.querySelectorAll('.news-article').forEach(article => {
-        const show = type === 'all' || article.dataset.type === type;
-        article.style.display = show ? 'grid' : 'none';
-    });
+    const filtered = type === 'all' ? 
+        allArticles : 
+        allArticles.filter(article => article.type === type);
+    
+    currentPage = 1;
+    showNews(currentPage);
+    createPagination(filtered.length);
 }
