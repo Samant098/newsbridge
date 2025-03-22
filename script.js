@@ -40,10 +40,34 @@ async function fetchNews(url, type) {
     }
 }
 
-function getImageUrl(item) {
-    return item.enclosure?.link || 
-        item.media?.content?.url || 
-        (item.description.match(/src="(https?:\/\/[^"]+\.(jpg|png|webp))"/i)?.[1]);
+// In script.js - Modify the getImageUrl and getFallbackImage functions
+
+// Replace existing image handling functions with this:
+function getImageUrl(article) {
+    // Detect Getty Images URLs
+    if (article.image && article.image.includes('gettyimages')) {
+        return getFallbackImage(article);
+    }
+    return article.image ? 
+        `https://images.weserv.nl/?url=${encodeURIComponent(article.image)}` : 
+        getFallbackImage(article);
+}
+
+function getFallbackImage(article) {
+    // Use Google Custom Search API for relevant images (free tier available)
+    const keywords = encodeURIComponent(`${article.title} ${article.type} news`);
+    return `https://source.unsplash.com/600x400/?${keywords}`;
+    
+    // Alternative: Use Wikimedia Commons
+    // return `https://commons.wikimedia.org/w/api.php?action=query&titles=${keywords}&prop=imageinfo&iiprop=url&format=json`;
+}
+
+// In the showNews function's image HTML - Add error handling:
+<img class="news-image" 
+     src="${getImageUrl(article)}" 
+     alt="${article.title}"
+     loading="lazy"
+     onerror="this.onerror=null;this.src='${getFallbackImage(article)}'">
 }
 
 // Display News
